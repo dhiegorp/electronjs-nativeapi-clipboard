@@ -1,5 +1,5 @@
 const electron = require('electron');
-const { app, BrowserWindow, Tray, Menu, clipboard } = electron;
+const { app, BrowserWindow, Tray, Menu, clipboard, globalShortcut } = electron;
 const path = require('path')
 
 let mainWindow;
@@ -23,16 +23,26 @@ function checkClipboardForChange(clipboard, onchange) {
     }, 1000)
 };
 
+function registerShortcuts(globalShortcut, clipboard, stack) {
+    globalShortcut.unregisterAll();
+    for (let i = 0; i < STACK_SIZE; i++) {
+        globalShortcut.register(`CommandOrControl+Alt+${i + 1}`, _ => {
+            clipboard.writeText(stack[i]);
+        });
+    }
+}
+
 function formatItem(item) {
-    return item && item.length > ITEM_MAX_LENGTH ? stac.substr(0, ITEM_MAX_LENGTH) + "..." : item;
+    return item && item.length > ITEM_MAX_LENGTH ? item.substr(0, ITEM_MAX_LENGTH) + "..." : item;
 }
 
 function formatMenu(clipboard, stack) {
-    return stack.map((item, i) => 
+    return stack.map((item, i) => {
         return {
-        label: `Copy: ${formatItem(item)}`,
-        click: _ => clipboard.writeItem(item)
-    }
+            label: `Copy: ${formatItem(item)}`,
+            click: _ => clipboard.writeItem(item),
+            accelerator: `CommandOrControl+Alt+${i + 1}`
+        }
     });
 }
 
@@ -46,7 +56,13 @@ app.on('ready', _ => {
     ]))
     checkClipboardForChange(clipboard, text => {
         stack = addToStack(text, stack);
-        tray.setContextMenu(Menu.buildFromTemplate(formatMenu(stack)))
+        console.log(stack);
+        tray.setContextMenu(Menu.buildFromTemplate(formatMenu(clipboard, stack)))
+        registerShortcuts(globalShortcut, clipboard, stack)
     })
     mainWindow = new BrowserWindow();
+});
+
+app.on('will-quit', _ => {
+    globalShortcut.unregisterAll();
 });
